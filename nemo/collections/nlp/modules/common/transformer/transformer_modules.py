@@ -26,6 +26,8 @@ from nemo.utils import logging
 
 __all__ = ["TransformerEmbedding", "AttentionBridge"]
 
+SEGSEP_ID = 5
+
 
 class FixedPositionalEncoding(nn.Module):
     """
@@ -120,6 +122,18 @@ class TransformerEmbedding(nn.Module):
         self.layer_norm = nn.LayerNorm(hidden_size, eps=1e-5)
         self.dropout = nn.Dropout(embedding_dropout)
 
+    @staticmethod
+    def _shift_position_ids_for_few_shot(input_ids, position_ids):
+        where = (input_ids == SEGSEP_ID).int()
+        where_flipped = where.flip(dims=(1,))
+        argm = torch.argmax(where_flipped, dim=1)
+        last_occ = (where_flipped.shape[1] - argm - 1)
+        for i,j in enumerate(last_occ.tolist()):
+            position_ids[i][:j] += 1024
+            position_ids[i][j:] = torch.arange(start=0, end=position_ids.shape[1] - j , dtype=torch.long, device=position_ids.device)
+
+        return position_ids
+
     def forward(self, input_ids, token_type_ids=None, start_pos=0):
         seq_length = input_ids.size(1)
         # we fail here only with parametric positional embedding. FixedPositionalEncoding automatically extends.
@@ -132,6 +146,9 @@ class TransformerEmbedding(nn.Module):
             start=start_pos, end=start_pos + seq_length, dtype=torch.long, device=input_ids.device
         )
         position_ids = position_ids.unsqueeze(0).repeat(input_ids.size(0), 1)
+
+        if False:
+            position_ids = self._shift_position_ids_for_few_shot(input_ids, position_ids)
 
         token_embeddings = self.token_embedding(input_ids)
         position_embeddings = self.position_embedding(position_ids)
