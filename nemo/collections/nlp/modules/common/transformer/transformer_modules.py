@@ -129,7 +129,7 @@ class TransformerEmbedding(nn.Module):
         argm = torch.argmax(where_flipped, dim=1)
         last_occ = (where_flipped.shape[1] - argm - 1)
         for i,j in enumerate(last_occ.tolist()):
-            position_ids[i][:j] += 1024
+            position_ids[i][1:j] += 1024  # exclude BOS
             position_ids[i][j:] = torch.arange(start=0, end=position_ids.shape[1] - j , dtype=torch.long, device=position_ids.device)
 
         return position_ids
@@ -147,7 +147,7 @@ class TransformerEmbedding(nn.Module):
         )
         position_ids = position_ids.unsqueeze(0).repeat(input_ids.size(0), 1)
 
-        if False:
+        if True:
             position_ids = self._shift_position_ids_for_few_shot(input_ids, position_ids)
 
         token_embeddings = self.token_embedding(input_ids)
